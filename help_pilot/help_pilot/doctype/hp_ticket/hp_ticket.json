@@ -111,6 +111,7 @@
    "label": "Requester"
   },
   {
+   "default": "__user",
    "fieldname": "raised_by",
    "fieldtype": "Link",
    "label": "Raised By",

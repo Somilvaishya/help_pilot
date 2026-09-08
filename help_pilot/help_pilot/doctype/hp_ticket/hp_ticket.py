@@ -28,7 +28,10 @@ REQUESTER_TRANSITIONS = {
 
 class HPTicket(Document):
 	def before_insert(self):
-		if not self.raised_by:
+		# The field carries a `__user` default so the form can satisfy its own
+		# mandatory check, but only a system admin may raise on someone else's
+		# behalf -- everyone else is pinned to their session.
+		if not self.raised_by or not is_system_admin():
 			self.raised_by = frappe.session.user
 		self.opening_datetime = now_datetime()
 		self.status = "Open"
