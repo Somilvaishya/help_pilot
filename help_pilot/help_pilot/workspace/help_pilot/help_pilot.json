@@ -1,0 +1,133 @@
+{
+ "charts": [
+  {
+   "chart_name": "HP Tickets by Status",
+   "label": "HP Tickets by Status"
+  },
+  {
+   "chart_name": "HP Tickets by Department",
+   "label": "HP Tickets by Department"
+  },
+  {
+   "chart_name": "HP Ticket Trend",
+   "label": "HP Ticket Trend"
+  }
+ ],
+ "content": "[{\"id\": \"hpHeaderTickets\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>My Work</b></span>\", \"col\": 12}}, {\"id\": \"hpScTicket\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"HP Ticket\", \"col\": 3}}, {\"id\": \"hpScMyTickets\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"My Tickets\", \"col\": 3}}, {\"id\": \"hpScDept\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"HP Department\", \"col\": 3}}, {\"id\": \"hpSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hpHeaderStats\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Ticket Health</b></span>\", \"col\": 12}}, {\"id\": \"hpNcOpen\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"HP Open Tickets\", \"col\": 3}}, {\"id\": \"hpNcProgress\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"HP Tickets In Progress\", \"col\": 3}}, {\"id\": \"hpNcResolved\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"HP Resolved Tickets\", \"col\": 3}}, {\"id\": \"hpNcTotal\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"HP Total Tickets\", \"col\": 3}}, {\"id\": \"hpSpacer2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hpHeaderAnalytics\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Analytics</b></span>\", \"col\": 12}}, {\"id\": \"hpChartStatus\", \"type\": \"chart\", \"data\": {\"chart_name\": \"HP Tickets by Status\", \"col\": 6}}, {\"id\": \"hpChartDept\", \"type\": \"chart\", \"data\": {\"chart_name\": \"HP Tickets by Department\", \"col\": 6}}, {\"id\": \"hpChartTrend\", \"type\": \"chart\", \"data\": {\"chart_name\": \"HP Ticket Trend\", \"col\": 12}}, {\"id\": \"hpSpacer3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hpHeaderSetup\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Setup</b></span>\", \"col\": 12}}, {\"id\": \"hpCardMasters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"hpCardTickets\", \"type\": \"card\", \"data\": {\"card_name\": \"Tickets\", \"col\": 4}}]",
+ "creation": "2026-09-08 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "support",
+ "idx": 0,
+ "indicator_color": "blue",
+ "is_hidden": 0,
+ "label": "Help Pilot",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Masters",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "description": "Departments and their agents / department admins",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HP Department",
+   "link_count": 0,
+   "link_to": "HP Department",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tickets",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "description": "All tickets you have access to",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HP Ticket",
+   "link_count": 0,
+   "link_to": "HP Ticket",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "description": "Replies and internal notes",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HP Ticket Comment",
+   "link_count": 0,
+   "link_to": "HP Ticket Comment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Help Pilot",
+ "name": "Help Pilot",
+ "number_cards": [
+  {
+   "label": "HP Open Tickets",
+   "number_card_name": "HP Open Tickets"
+  },
+  {
+   "label": "HP Tickets In Progress",
+   "number_card_name": "HP Tickets In Progress"
+  },
+  {
+   "label": "HP Resolved Tickets",
+   "number_card_name": "HP Resolved Tickets"
+  },
+  {
+   "label": "HP Total Tickets",
+   "number_card_name": "HP Total Tickets"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 25.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "HP Ticket",
+   "link_to": "HP Ticket",
+   "stats_filter": "{\"status\": [\"in\", [\"Open\", \"Reopened\", \"In Progress\"]]}",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "kanban_board": "",
+   "label": "My Tickets",
+   "link_to": "HP Ticket",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "HP Department",
+   "link_to": "HP Department",
+   "type": "DocType"
+  }
+ ],
+ "title": "Help Pilot"
+}

@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "ticket",
+  "comment_by",
+  "column_break_cmt",
+  "is_internal_note",
+  "comment_section",
+  "comment"
+ ],
+ "fields": [
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Ticket",
+   "options": "HP Ticket",
+   "read_only_depends_on": "eval:!doc.__islocal",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "comment_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Comment By",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_cmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Internal notes are visible only to the department's agents and admins, never to the requester.",
+   "fieldname": "is_internal_note",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Internal Note"
+  },
+  {
+   "fieldname": "comment_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "comment",
+   "fieldtype": "Text Editor",
+   "in_global_search": 1,
+   "label": "Comment",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Help Pilot",
+ "name": "HP Ticket Comment",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HP System Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HP Department Admin",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HP Agent",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "HP User"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "ticket"
+}
