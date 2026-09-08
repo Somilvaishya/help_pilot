@@ -6,12 +6,15 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form, now_datetime
 
-from help_pilot.permissions import get_user_departments, is_system_admin
+from help_pilot.permissions import can_raise_on_behalf, get_user_departments, is_system_admin
 
 
 class HPTicketComment(Document):
 	def before_insert(self):
-		self.comment_by = frappe.session.user
+		# A bridge account relays replies typed by a requester on another site,
+		# so it may attribute the comment to them. Nobody else can.
+		if not self.comment_by or not can_raise_on_behalf():
+			self.comment_by = frappe.session.user
 
 	def validate(self):
 		self.ticket_doc = frappe.get_doc("HP Ticket", self.ticket)
@@ -19,15 +22,23 @@ class HPTicketComment(Document):
 		self.validate_internal_note()
 
 	def validate_can_comment(self):
-		user = frappe.session.user
-		if self.is_agent(user) or self.ticket_doc.raised_by == user:
+		# Check the author, not the session: `before_insert` has already pinned
+		# `comment_by` to the session user unless the caller may act on someone
+		# else's behalf, so by now it is the trustworthy answer to "who wrote
+		# this". Using the session here would reject a bridge relaying a reply
+		# a requester typed on another site.
+		author = self.author()
+		if self.is_agent(author) or self.ticket_doc.raised_by == author:
 			return
 
 		frappe.throw(_("You are not allowed to comment on this ticket."), frappe.PermissionError)
 
 	def validate_internal_note(self):
-		if self.is_internal_note and not self.is_agent(frappe.session.user):
+		if self.is_internal_note and not self.is_agent(self.author()):
 			frappe.throw(_("Only agents can add internal notes."), frappe.PermissionError)
+
+	def author(self) -> str:
+		return self.comment_by or frappe.session.user
 
 	def is_agent(self, user: str) -> bool:
 		if is_system_admin(user):

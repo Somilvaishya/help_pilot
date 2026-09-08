@@ -8,6 +8,9 @@ ROLES = [
 	{"role_name": "HP Agent", "desk_access": 1},
 	{"role_name": "HP Department Admin", "desk_access": 1},
 	{"role_name": "HP System Admin", "desk_access": 1},
+	# API-only: relays tickets from other ERP sites. Deliberately has no desk
+	# access and no read permission on any Help Pilot doctype.
+	{"role_name": "HP Bridge", "desk_access": 0},
 ]
 
 

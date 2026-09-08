@@ -16,6 +16,7 @@ import frappe
 
 SYSTEM_ADMIN_ROLES = {"HP System Admin", "Administrator", "System Manager"}
 AGENT_ROLES = {"HP Agent", "HP Department Admin"}
+BRIDGE_ROLE = "HP Bridge"
 
 DEPARTMENT_CACHE_KEY = "help_pilot_user_departments"
 
@@ -30,6 +31,17 @@ def is_system_admin(user: str | None = None) -> bool:
 def is_agent(user: str | None = None) -> bool:
 	user = user or frappe.session.user
 	return bool(AGENT_ROLES & set(frappe.get_roles(user)))
+
+
+def can_raise_on_behalf(user: str | None = None) -> bool:
+	"""May this account file a ticket, or reply, in someone else's name?
+
+	Only two kinds of caller can: a system admin logging a phoned-in complaint,
+	and a bridge account relaying a ticket from another ERP site. Neither path
+	is reachable from the ticket form, which keeps `raised_by` read-only.
+	"""
+	user = user or frappe.session.user
+	return is_system_admin(user) or BRIDGE_ROLE in set(frappe.get_roles(user))
 
 
 def get_user_departments(user: str | None = None) -> list[str]:

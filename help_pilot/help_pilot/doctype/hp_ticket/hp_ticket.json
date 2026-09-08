@@ -22,6 +22,10 @@
   "column_break_req",
   "opening_datetime",
   "reopen_count",
+  "origin_section",
+  "source_site",
+  "column_break_origin",
+  "source_reference",
   "resolution_section",
   "first_responded_on",
   "resolution_date",
@@ -143,6 +147,35 @@
    "fieldtype": "Int",
    "label": "Reopen Count",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "source_site",
+   "fieldname": "origin_section",
+   "fieldtype": "Section Break",
+   "label": "Origin"
+  },
+  {
+   "description": "The ERP site this ticket was raised from. Empty means it was raised on the hub itself.",
+   "fieldname": "source_site",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Source Site",
+   "options": "HP Source Site",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_origin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Idempotency key from the source site, so a retried delivery cannot create a duplicate ticket.",
+   "fieldname": "source_reference",
+   "fieldtype": "Data",
+   "label": "Source Reference",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "collapsible": 1,

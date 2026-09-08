@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, get_url_to_form, now_datetime, time_diff_in_seconds
 
-from help_pilot.permissions import get_user_departments, is_system_admin
+from help_pilot.permissions import can_raise_on_behalf, get_user_departments, is_system_admin
 
 OPEN_STATUSES = ("Open", "In Progress", "Reopened")
 CLOSED_STATUSES = ("Resolved", "Closed")
@@ -29,9 +29,9 @@ REQUESTER_TRANSITIONS = {
 class HPTicket(Document):
 	def before_insert(self):
 		# The field carries a `__user` default so the form can satisfy its own
-		# mandatory check, but only a system admin may raise on someone else's
-		# behalf -- everyone else is pinned to their session.
-		if not self.raised_by or not is_system_admin():
+		# mandatory check, but only a system admin or a site bridge may raise on
+		# someone else's behalf -- everyone else is pinned to their session.
+		if not self.raised_by or not can_raise_on_behalf():
 			self.raised_by = frappe.session.user
 		self.opening_datetime = now_datetime()
 		self.status = "Open"

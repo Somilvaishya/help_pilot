@@ -1,0 +1,4 @@
+[pre_model_sync]
+
+[post_model_sync]
+help_pilot.patches.v0_0_1.create_bridge_role
