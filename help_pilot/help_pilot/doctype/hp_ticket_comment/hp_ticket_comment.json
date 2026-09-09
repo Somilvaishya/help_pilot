@@ -12,7 +12,13 @@
   "column_break_cmt",
   "is_internal_note",
   "comment_section",
-  "comment"
+  "comment",
+  "ticket_details_section",
+  "ticket_raised_by",
+  "ticket_assigned_agent",
+  "column_break_td",
+  "ticket_subject",
+  "ticket_department"
  ],
  "fields": [
   {
@@ -58,6 +64,48 @@
    "in_global_search": 1,
    "label": "Comment",
    "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "description": "Copied from the ticket so email Notifications can address the right people without extra code.",
+   "fieldname": "ticket_details_section",
+   "fieldtype": "Section Break",
+   "label": "Ticket Details"
+  },
+  {
+   "fetch_from": "ticket.raised_by",
+   "fieldname": "ticket_raised_by",
+   "fieldtype": "Link",
+   "label": "Ticket Raised By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "ticket.assigned_agent",
+   "fieldname": "ticket_assigned_agent",
+   "fieldtype": "Link",
+   "label": "Ticket Assigned Agent",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_td",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "ticket.subject",
+   "fieldname": "ticket_subject",
+   "fieldtype": "Data",
+   "label": "Ticket Subject",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "ticket.department",
+   "fieldname": "ticket_department",
+   "fieldtype": "Link",
+   "label": "Ticket Department",
+   "options": "HP Department",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
