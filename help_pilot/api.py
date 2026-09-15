@@ -5,6 +5,7 @@
 
 import frappe
 from frappe import _
+from frappe.utils import now_datetime
 
 from help_pilot import realtime
 from help_pilot.permissions import get_user_departments, is_system_admin
@@ -168,6 +169,54 @@ def transfer_ticket(
 		"name": ticket,
 		"department": department,
 		"still_visible": _can_act_as_agent(department),
+	}
+
+
+@frappe.whitelist()
+def poll_alerts(since: str | None = None) -> dict:
+	"""Help Pilot alerts raised since this browser last looked.
+
+	The websocket is the primary path and is instant. This is the backstop for
+	when it is not connected -- a failure that is otherwise invisible, because
+	the bell count still moves and nothing else happens, so it reads as "the
+	notification only arrives when I refresh".
+
+	The first call carries no `since` and deliberately returns nothing: it just
+	hands back the clock, so the browser has a starting point and does not
+	replay everything already sitting unread.
+	"""
+	user = frappe.session.user
+	now = str(now_datetime())
+
+	if user in ("Guest", None) or not since:
+		return {"events": [], "now": now}
+
+	rows = frappe.get_all(
+		"Notification Log",
+		filters={
+			"for_user": user,
+			"read": 0,
+			"document_type": "HP Ticket",
+			"creation": [">", since],
+		},
+		fields=["subject", "email_content", "document_name", "creation"],
+		order_by="creation asc",
+		limit_page_length=10,
+	)
+
+	return {
+		"events": [
+			{
+				"kind": "activity",
+				"title": row.subject,
+				"body": row.email_content,
+				"ticket": row.document_name,
+				"sound": realtime.SOUND_NEW,
+				"route": f"/app/hp-ticket/{row.document_name}" if row.document_name else None,
+			}
+			for row in rows
+		],
+		"now": now,
 	}
 
 

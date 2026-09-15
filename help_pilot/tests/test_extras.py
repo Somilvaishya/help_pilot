@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import frappe
 
-from help_pilot import bridge
+from help_pilot import bridge, realtime
 from help_pilot.tests.test_bridge import OTHER, REQUESTER, SITE_A, BaseBridgeTest
 
 IT = "Bridge IT"
@@ -251,7 +251,7 @@ class TestLiveAlerts(BaseBridgeTest):
 
 		payloads = [call.args[1] for call in pushed.call_args_list if len(call.args) > 1]
 		self.assertTrue(payloads)
-		self.assertEqual(payloads[0]["sound"], "email")
+		self.assertEqual(payloads[0]["sound"], realtime.SOUND_REPLY)
 		self.assertIn(ticket, payloads[0]["route"])
 
 

@@ -30,11 +30,20 @@ help_pilot.play = function (name) {
 	if (!help_pilot.sound_enabled()) {
 		return;
 	}
+
+	// play_sound looks up an <audio> element by id and throws if the sound was
+	// never registered. Fall back to one Frappe always ships rather than go
+	// silent, which is indistinguishable from the feature being broken.
+	let sound = name || "hp_new";
+	if (!$("#sound-" + sound).length) {
+		sound = "alert";
+	}
+
 	try {
-		frappe.utils.play_sound(name || "chime");
+		frappe.utils.play_sound(sound);
 	} catch (e) {
-		// Some browsers refuse audio until the user has interacted with the
-		// page. Silence is the right fallback, never an error.
+		// Browsers refuse audio before the first interaction with the page.
+		// Silence is the right fallback, never an error.
 	}
 };
 
@@ -131,7 +140,52 @@ help_pilot.ask_desktop_permission = function () {
 	});
 };
 
-$(document).on("app_ready", function () {
+help_pilot.since = null;
+help_pilot.poll_timer = null;
+
+// Realtime is instant but silently dead if the websocket never connects, and
+// the user cannot tell: the bell count still moves. Poll as a backstop.
+help_pilot.POLL_MS = 60000;
+
+help_pilot.poll = function () {
+	frappe.call({
+		method: "help_pilot.api.poll_alerts",
+		args: { since: help_pilot.since },
+		freeze: false,
+		callback: ({ message }) => {
+			if (!message) {
+				return;
+			}
+			help_pilot.since = message.now || help_pilot.since;
+			(message.events || []).forEach(help_pilot.alert);
+		},
+		error: () => {},
+	});
+};
+
+help_pilot.start = function () {
+	if (help_pilot.started) {
+		return;
+	}
+	help_pilot.started = true;
+
 	frappe.realtime.on("help_pilot_activity", help_pilot.alert);
 	help_pilot.ask_desktop_permission();
+
+	help_pilot.poll();
+	help_pilot.poll_timer = setInterval(help_pilot.poll, help_pilot.POLL_MS);
+	$(document).on("visibilitychange", () => {
+		if (!document.hidden) {
+			help_pilot.poll();
+		}
+	});
+};
+
+// app_ready may already have fired by the time this bundle runs, in which case
+// binding only to the event would never happen at all.
+$(document).on("app_ready", help_pilot.start);
+$(document).ready(() => {
+	if (frappe.realtime && frappe.boot) {
+		help_pilot.start();
+	}
 });

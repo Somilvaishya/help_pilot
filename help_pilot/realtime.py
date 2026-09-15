@@ -15,11 +15,12 @@ import frappe
 
 EVENT = "help_pilot_activity"
 
-# Frappe ships these in /assets/frappe/sounds; we add no audio of our own.
-SOUND_NEW = "chime"
-SOUND_REPLY = "email"
-SOUND_STATUS = "alert"
-SOUND_URGENT = "error"
+# Registered in hooks.py against files Frappe already ships. Do not use its own
+# names here: "chime" is commented out in Frappe's hooks, so it plays nothing.
+SOUND_NEW = "hp_new"
+SOUND_REPLY = "hp_reply"
+SOUND_STATUS = "hp_status"
+SOUND_URGENT = "hp_urgent"
 
 
 def push(
