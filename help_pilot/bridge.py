@@ -24,6 +24,7 @@ from frappe.utils import cint, get_url, now_datetime, strip_html, validate_email
 from help_pilot.permissions import BRIDGE_ROLE, is_system_admin
 
 MAX_SUBJECT = 200
+MAX_CONTACT = 40
 MAX_DESCRIPTION = 20000
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -90,18 +91,29 @@ def _ensure_requester(email: str, full_name: str | None = None) -> str:
 
 	first_name = (full_name or email.split("@")[0]).strip()[:140]
 
-	user = frappe.get_doc(
-		{
-			"doctype": "User",
-			"email": email,
-			"first_name": first_name,
-			"user_type": "Website User",
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}
-	).insert(ignore_permissions=True)
+	# Creating a User fires every other app's after_insert hook -- `suite` builds
+	# a Drive team, for one -- and those insert documents of their own *without*
+	# ignore_permissions. Running under the bridge account, which deliberately
+	# holds almost no rights, they raise PermissionError and take the whole
+	# ticket down with them. Provisioning an identity is a system action, so
+	# perform it as the system and hand the session straight back.
+	session_user = frappe.session.user
+	try:
+		frappe.set_user("Administrator")
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": first_name,
+				"user_type": "Website User",
+				"send_welcome_email": 0,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
 
-	_keep_as_website_user(user)
+		_keep_as_website_user(user)
+	finally:
+		frappe.set_user(session_user)
 
 	return email
 
@@ -140,6 +152,50 @@ def _keep_as_website_user(user):
 	frappe.clear_cache(user=user.name)
 
 
+def _ensure_branch(branch: str | None) -> str | None:
+	"""Map a branch name from a client site onto a Branch record here.
+
+	Client sites keep their own Branch list in their own database, so the name
+	arrives as text. Create it on first sight rather than dropping it -- a
+	rejected ticket helps nobody, and an unknown branch is not an error, just a
+	branch this hub has not seen yet.
+	"""
+	branch = (branch or "").strip()
+	if not branch:
+		return None
+
+	if not frappe.db.exists("DocType", "Branch"):
+		# erpnext is not installed on this hub; nothing to link to.
+		return None
+
+	if frappe.db.exists("Branch", branch):
+		return branch
+
+	frappe.get_doc({"doctype": "Branch", "branch": branch}).insert(ignore_permissions=True)
+	return branch
+
+
+def _resolve_category(category: str | None, department: str) -> str | None:
+	"""Accept either the full category id or a bare name within the department."""
+	category = (category or "").strip()
+	if not category:
+		return None
+
+	if frappe.db.exists("HP Issue Category", category):
+		return category
+
+	# The client may have sent just "Laptop"; the record is "IT - Laptop".
+	match = frappe.db.get_value(
+		"HP Issue Category", {"department": department, "category_name": category}, "name"
+	)
+	if match:
+		return match
+
+	frappe.throw(
+		_("{0} is not a category of {1}.").format(category, department), frappe.ValidationError
+	)
+
+
 def _owned_ticket(site, requester_email: str, ticket: str):
 	"""A ticket the caller is allowed to touch: same site, same requester."""
 	doc = frappe.db.get_value(
@@ -170,6 +226,9 @@ def create_ticket(
 	priority: str = "Medium",
 	requester_full_name: str | None = None,
 	source_reference: str | None = None,
+	issue_category: str | None = None,
+	branch: str | None = None,
+	contact_no: str | None = None,
 ) -> dict:
 	site = _authorise(source_site)
 	requester_email = _clean_email(requester_email)
@@ -198,12 +257,24 @@ def create_ticket(
 
 	_ensure_requester(requester_email, requester_full_name)
 
+	category = _resolve_category(issue_category, department)
+
+	# A category may carry its own default priority, used only when the client
+	# did not send one of its own.
+	if category and priority not in ("Low", "High", "Urgent"):
+		category_priority = frappe.db.get_value("HP Issue Category", category, "default_priority")
+		if category_priority:
+			priority = category_priority
+
 	ticket = frappe.get_doc(
 		{
 			"doctype": "HP Ticket",
 			"subject": subject.strip()[:MAX_SUBJECT],
 			"description": description[:MAX_DESCRIPTION],
 			"department": department,
+			"issue_category": category,
+			"branch": _ensure_branch(branch),
+			"contact_no": (contact_no or "").strip()[:MAX_CONTACT] or None,
 			"priority": priority if priority in ("Low", "Medium", "High", "Urgent") else "Medium",
 			"raised_by": requester_email,
 			"source_site": site.name,
@@ -307,6 +378,38 @@ def get_departments(source_site: str) -> list[dict]:
 
 
 @frappe.whitelist()
+def get_categories(source_site: str, department: str | None = None) -> list[dict]:
+	"""Active issue categories, optionally narrowed to one department."""
+	_authorise(source_site)
+
+	filters = {"is_active": 1}
+	if department:
+		filters["department"] = department
+
+	return frappe.get_all(
+		"HP Issue Category",
+		filters=filters,
+		fields=["name", "category_name", "department", "description"],
+		order_by="department asc, category_name asc",
+	)
+
+
+@frappe.whitelist()
+def get_attachments(source_site: str, requester_email: str, ticket: str) -> list[dict]:
+	"""Files on a ticket, for the requester to see what they have already sent."""
+	site = _authorise(source_site)
+	requester_email = _clean_email(requester_email)
+	_owned_ticket(site, requester_email, ticket)
+
+	return frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": "HP Ticket", "attached_to_name": ticket},
+		fields=["name", "file_name", "file_size", "creation"],
+		order_by="creation asc",
+	)
+
+
+@frappe.whitelist()
 def get_my_tickets(
 	source_site: str, requester_email: str, status: str | None = None, limit: int = 50
 ) -> list[dict]:
@@ -403,6 +506,15 @@ def get_ticket(source_site: str, requester_email: str, ticket: str) -> dict:
 		"subject": doc.subject,
 		"description": doc.description,
 		"department": doc.department,
+		"issue_category": doc.issue_category,
+		"branch": doc.branch,
+		"contact_no": doc.contact_no,
+		"attachments": frappe.get_all(
+			"File",
+			filters={"attached_to_doctype": "HP Ticket", "attached_to_name": ticket},
+			fields=["name", "file_name", "file_size"],
+			order_by="creation asc",
+		),
 		"status": doc.status,
 		"priority": doc.priority,
 		"opening_datetime": doc.opening_datetime,

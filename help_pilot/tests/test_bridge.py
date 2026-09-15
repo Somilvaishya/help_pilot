@@ -45,6 +45,23 @@ def make_user(email, name, roles):
 	return email
 
 
+def make_requester(email, name):
+	"""A hub-side requester: Website User, no roles, exactly as the bridge makes them."""
+	if frappe.db.exists("User", email):
+		return email
+
+	frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": email,
+			"first_name": name,
+			"send_welcome_email": 0,
+			"user_type": "Website User",
+		}
+	).insert(ignore_permissions=True)
+	return email
+
+
 def make_source_site(name, bridge_user, department="Bridge IT"):
 	if frappe.db.exists("HP Source Site", name):
 		frappe.delete_doc("HP Source Site", name, force=1, ignore_permissions=True)
@@ -68,6 +85,13 @@ class BaseBridgeTest(FrappeTestCase):
 		cls.bridge_a = make_user(BRIDGE_A, "Bridge A", ["HP Bridge"])
 		cls.bridge_b = make_user(BRIDGE_B, "Bridge B", ["HP Bridge"])
 		cls.agent = make_user(AGENT, "Bridge Agent", ["HP User", "HP Agent"])
+
+		# Create the requesters up front, as the system. Auto-provisioning is
+		# covered on its own in test_extras; every other test here is about
+		# tickets, and should not depend on what other apps do to a brand new
+		# User in their own hooks.
+		make_requester(REQUESTER, "Priya Sharma")
+		make_requester(OTHER, "Vikram Rao")
 
 		if not frappe.db.exists("HP Department", "Bridge IT"):
 			dept = frappe.get_doc(
@@ -169,9 +193,10 @@ class TestBridgeCreate(BaseBridgeTest):
 		self.assertEqual(row.status, "Open")
 
 	def test_requester_is_provisioned_without_roles(self):
-		self.raise_via_bridge(self.bridge_a, SITE_A, REQUESTER)
-		self.assertEqual(frappe.db.get_value("User", REQUESTER, "user_type"), "Website User")
-		self.assertEqual(frappe.get_all("Has Role", filters={"parent": REQUESTER}, pluck="role"), [])
+		fresh = f"auto.{frappe.generate_hash(length=8)}@test.local"
+		self.raise_via_bridge(self.bridge_a, SITE_A, fresh)
+		self.assertEqual(frappe.db.get_value("User", fresh, "user_type"), "Website User")
+		self.assertEqual(frappe.get_all("Has Role", filters={"parent": fresh}, pluck="role"), [])
 
 	def test_replayed_delivery_returns_the_original(self):
 		first = self.raise_via_bridge(self.bridge_a, SITE_A, REQUESTER, reference="outbox-1")

@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form, now_datetime
 
+from help_pilot import realtime
 from help_pilot.permissions import can_raise_on_behalf, get_user_departments, is_system_admin
 
 
@@ -77,6 +78,15 @@ class HPTicketComment(Document):
 
 		recipients.discard(self.comment_by)
 		recipients = {r for r in recipients if r and r != "Administrator"}
+
+		realtime.push(
+			recipients,
+			title=_("New reply on {0}").format(ticket.subject or ticket.name),
+			body=self.comment,
+			ticket=ticket.name,
+			sound=realtime.SOUND_REPLY,
+			kind="internal_note" if self.is_internal_note else "reply",
+		)
 
 		for recipient in recipients:
 			frappe.get_doc(

@@ -7,6 +7,10 @@ frappe.ui.form.on("HP Ticket", {
 			query: "help_pilot.api.department_agent_query",
 			filters: { department: frm.doc.department },
 		}));
+
+		frm.set_query("issue_category", () => ({
+			filters: { department: frm.doc.department, is_active: 1 },
+		}));
 	},
 
 	refresh(frm) {
@@ -28,8 +32,12 @@ frappe.ui.form.on("HP Ticket", {
 	},
 
 	department(frm) {
+		// Both of these belong to the old department and cannot survive the move.
 		if (frm.doc.assigned_agent) {
 			frm.set_value("assigned_agent", null);
+		}
+		if (frm.doc.issue_category) {
+			frm.set_value("issue_category", null);
 		}
 	},
 });

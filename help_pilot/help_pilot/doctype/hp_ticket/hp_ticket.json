@@ -10,6 +10,7 @@
   "naming_series",
   "subject",
   "department",
+  "issue_category",
   "column_break_head",
   "status",
   "priority",
@@ -19,7 +20,9 @@
   "requester_section",
   "raised_by",
   "raised_by_name",
+  "contact_no",
   "column_break_req",
+  "branch",
   "opening_datetime",
   "reopen_count",
   "origin_section",
@@ -62,6 +65,15 @@
    "label": "Department",
    "options": "HP Department",
    "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "depends_on": "department",
+   "fieldname": "issue_category",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Issue Category",
+   "options": "HP Issue Category",
    "search_index": 1
   },
   {
@@ -132,8 +144,23 @@
    "read_only": 1
   },
   {
+   "description": "Where the agent can reach the requester if they need to talk it through.",
+   "fieldname": "contact_no",
+   "fieldtype": "Data",
+   "label": "Contact No.",
+   "options": "Phone"
+  },
+  {
    "fieldname": "column_break_req",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "search_index": 1
   },
   {
    "fieldname": "opening_datetime",

@@ -9,6 +9,7 @@ app_license = "mit"
 # Includes
 # ----------------------------------------------------------------------
 app_include_css = "/assets/help_pilot/css/help_pilot.css"
+app_include_js = "/assets/help_pilot/js/help_pilot.js"
 
 # ----------------------------------------------------------------------
 # Installation

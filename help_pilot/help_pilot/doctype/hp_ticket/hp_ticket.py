@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, get_url_to_form, now_datetime, time_diff_in_seconds
 
+from help_pilot import realtime
 from help_pilot.permissions import can_raise_on_behalf, get_user_departments, is_system_admin
 
 OPEN_STATUSES = ("Open", "In Progress", "Reopened")
@@ -39,9 +40,37 @@ class HPTicket(Document):
 
 	def validate(self):
 		self.validate_department_is_active()
+		self.validate_issue_category()
 		self.validate_status_transition()
 		self.validate_assigned_agent()
 		self.set_resolution_timestamps()
+
+	def validate_issue_category(self):
+		"""A category belongs to exactly one department; they must agree."""
+		# `.get` rather than attribute access: a site that has the app but has
+		# not migrated yet would otherwise crash on every save.
+		category_name = self.get("issue_category")
+		if not category_name:
+			return
+
+		category = frappe.db.get_value(
+			"HP Issue Category", category_name, ["department", "is_active"], as_dict=True
+		)
+
+		if not category:
+			frappe.throw(_("Issue category {0} does not exist.").format(category_name))
+
+		if category.department != self.department:
+			frappe.throw(
+				_("{0} belongs to {1}, not {2}.").format(
+					frappe.bold(category_name),
+					frappe.bold(category.department),
+					frappe.bold(self.department),
+				)
+			)
+
+		if not category.is_active and self.is_new():
+			frappe.throw(_("Issue category {0} is no longer in use.").format(category_name))
 
 	def validate_department_is_active(self):
 		if not frappe.db.get_value("HP Department", self.department, "is_active"):
@@ -140,6 +169,8 @@ class HPTicket(Document):
 			message=_("{0} raised a {1} priority ticket for {2}.").format(
 				self.raised_by_name or self.raised_by, _(self.priority), self.department
 			),
+			sound=realtime.SOUND_URGENT if self.priority == "Urgent" else realtime.SOUND_NEW,
+			kind="new_ticket",
 		)
 
 	def notify_requester_of_status_change(self, previous_status: str):
@@ -152,6 +183,8 @@ class HPTicket(Document):
 			message=_("Your ticket {0} moved from {1} to {2}.").format(
 				self.subject, _(previous_status), _(self.status)
 			),
+			sound=realtime.SOUND_STATUS,
+			kind="status",
 		)
 
 	def notify_assigned_agent(self):
@@ -164,12 +197,23 @@ class HPTicket(Document):
 			message=_("{0} — {1} priority, raised by {2}.").format(
 				self.subject, _(self.priority), self.raised_by_name or self.raised_by
 			),
+			sound=realtime.SOUND_NEW,
+			kind="assigned",
 		)
 
-	def send_notification(self, recipients, subject: str, message: str):
+	def send_notification(
+		self,
+		recipients,
+		subject: str,
+		message: str,
+		sound: str = realtime.SOUND_NEW,
+		kind: str = "activity",
+	):
 		recipients = {r for r in recipients if r and r != "Administrator"}
 		if not recipients:
 			return
+
+		realtime.push(recipients, title=subject, body=message, ticket=self.name, sound=sound, kind=kind)
 
 		for recipient in recipients:
 			frappe.get_doc(
