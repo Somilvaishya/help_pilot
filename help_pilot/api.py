@@ -6,6 +6,7 @@
 import frappe
 from frappe import _
 
+from help_pilot import realtime
 from help_pilot.permissions import get_user_departments, is_system_admin
 
 
@@ -71,6 +72,102 @@ def get_ticket_context(ticket: str) -> dict:
 		"is_agent": _can_act_as_agent(doc.department),
 		"is_requester": doc.raised_by == frappe.session.user,
 		"status": doc.status,
+	}
+
+
+@frappe.whitelist()
+def transfer_ticket(
+	ticket: str,
+	department: str,
+	issue_category: str | None = None,
+	reason: str | None = None,
+) -> dict:
+	"""Hand a ticket to another department.
+
+	Closing a ticket that belongs to someone else is the wrong answer: the
+	requester has to start again and the history is lost. Moving it keeps the
+	thread, the attachments and the age, and tells both sides what happened.
+
+	Note the person doing this usually loses sight of the ticket the moment it
+	lands, because they are not a member of the receiving department. That is
+	the isolation working, so say so rather than leave them wondering.
+	"""
+	doc = frappe.get_doc("HP Ticket", ticket)
+	previous = doc.department
+
+	if not _can_act_as_agent(previous):
+		frappe.throw(
+			_("Only the {0} team can move this ticket.").format(previous), frappe.PermissionError
+		)
+
+	if department == previous:
+		frappe.throw(_("The ticket is already with {0}.").format(department), frappe.ValidationError)
+
+	target = frappe.db.get_value("HP Department", department, ["name", "is_active"], as_dict=True)
+	if not target:
+		frappe.throw(_("Department {0} does not exist.").format(department))
+	if not target.is_active:
+		frappe.throw(_("{0} is not active.").format(department))
+
+	if not reason or not reason.strip():
+		frappe.throw(_("Please say why it is moving. The next team needs it."))
+
+	moved_by = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+
+	# Write both notes *before* the move. A comment is checked against the
+	# ticket's current department, and the moment this ticket belongs to the
+	# other team its old agent may no longer write on it -- not even to record
+	# why they handed it over. Everything here shares one transaction, so a
+	# failure below takes these with it.
+	#
+	# The reason is operational, so it stays between agents.
+	frappe.get_doc(
+		{
+			"doctype": "HP Ticket Comment",
+			"ticket": ticket,
+			"comment": _("<p>Moved from <b>{0}</b> to <b>{1}</b> by {2}.</p><p>{3}</p>").format(
+				previous, department, moved_by, frappe.utils.escape_html(reason.strip())
+			),
+			"is_internal_note": 1,
+		}
+	).insert(ignore_permissions=True)
+
+	# The requester sees the department change anyway; better they hear it from
+	# the ticket than notice it and wonder.
+	frappe.get_doc(
+		{
+			"doctype": "HP Ticket Comment",
+			"ticket": ticket,
+			"comment": _("<p>This ticket has been moved to the <b>{0}</b> team.</p>").format(department),
+			"is_internal_note": 0,
+		}
+	).insert(ignore_permissions=True)
+
+	doc.reload()
+	doc.department = department
+	# Both belong to the department it is leaving.
+	doc.assigned_agent = None
+	doc.issue_category = issue_category or None
+	doc.save(ignore_permissions=True)
+
+	receiving = frappe.get_cached_doc("HP Department", department)
+	recipients = set(receiving.get_agents())
+	if receiving.department_head:
+		recipients.add(receiving.department_head)
+
+	realtime.push(
+		recipients,
+		title=_("{0} moved here: {1}").format(previous, doc.subject),
+		body=reason.strip(),
+		ticket=ticket,
+		sound=realtime.SOUND_NEW,
+		kind="new_ticket",
+	)
+
+	return {
+		"name": ticket,
+		"department": department,
+		"still_visible": _can_act_as_agent(department),
 	}
 
 

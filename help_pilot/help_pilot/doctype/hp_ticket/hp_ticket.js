@@ -79,6 +79,88 @@ function render_status_actions(frm) {
 			frm.set_value("assigned_agent", frappe.session.user).then(() => frm.save());
 		});
 	}
+
+	if (is_agent) {
+		frm.add_custom_button(__("Move to another team"), () => transfer(frm));
+	}
+}
+
+// Moving a ticket keeps the thread, the attachments and the age. Closing it
+// with "not our work" makes the requester start over.
+function transfer(frm) {
+	const dialog = new frappe.ui.Dialog({
+		title: __("Move this ticket"),
+		fields: [
+			{
+				fieldname: "department",
+				fieldtype: "Link",
+				options: "HP Department",
+				label: __("Which team should have it?"),
+				reqd: 1,
+				get_query: () => ({ filters: { is_active: 1, name: ["!=", frm.doc.department] } }),
+				onchange: () => {
+					dialog.set_value("issue_category", "");
+					dialog.set_df_property("issue_category", "hidden", !dialog.get_value("department"));
+				},
+			},
+			{
+				fieldname: "issue_category",
+				fieldtype: "Link",
+				options: "HP Issue Category",
+				label: __("Category in that team"),
+				hidden: 1,
+				get_query: () => ({
+					filters: { department: dialog.get_value("department"), is_active: 1 },
+				}),
+			},
+			{
+				fieldname: "reason",
+				fieldtype: "Small Text",
+				label: __("Why is it moving?"),
+				description: __("Kept as an internal note. The requester only sees that it moved."),
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Move"),
+		primary_action(values) {
+			dialog.disable_primary_action();
+
+			frappe.call({
+				method: "help_pilot.api.transfer_ticket",
+				args: { ticket: frm.doc.name, ...values },
+				freeze: true,
+				freeze_message: __("Moving..."),
+				callback: ({ message }) => {
+					dialog.hide();
+
+					if (message && message.still_visible) {
+						frappe.show_alert(
+							{ message: __("Moved to {0}", [message.department]), indicator: "green" },
+							7
+						);
+						frm.reload_doc();
+						return;
+					}
+
+					// They are not in the receiving team, so the ticket is about to
+					// disappear from their list. Say it plainly instead of letting
+					// the screen go blank on them.
+					frappe.msgprint({
+						title: __("Moved"),
+						indicator: "green",
+						message: __(
+							"This ticket is now with {0}. You are not a member of that team, so it will no longer appear in your list.",
+							[message.department]
+						),
+					});
+					frappe.set_route("List", "HP Ticket");
+				},
+				error: () => dialog.enable_primary_action(),
+			});
+		},
+	});
+
+	dialog.show();
 }
 
 function set_status(frm, status) {

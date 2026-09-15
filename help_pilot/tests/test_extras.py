@@ -12,6 +12,13 @@ from help_pilot.tests.test_bridge import OTHER, REQUESTER, SITE_A, BaseBridgeTes
 
 IT = "Bridge IT"
 HR = "Bridge HR"
+HR_AGENT = "hp.hragent@test.local"
+
+
+def make_hr_agent():
+	from help_pilot.tests.test_bridge import make_user
+
+	return make_user(HR_AGENT, "HR Agent", ["HP User", "HP Agent"])
 
 
 def make_department(name):
@@ -293,6 +300,135 @@ class TestRequesterProvisioning(BaseBridgeTest):
 			self.assertEqual(frappe.session.user, self.bridge_a)
 		finally:
 			frappe.set_user("Administrator")
+
+
+class TestTransfer(BaseBridgeTest):
+	"""Moving a ticket keeps everything; closing it with "not our work" does not."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		make_department(HR)
+		make_hr_agent()
+		hr = frappe.get_doc("HP Department", HR)
+		if not any(row.user == cls.agent for row in hr.members):
+			# A second agent who belongs to HR but not IT, to prove the handover.
+			hr.append("members", {"user": HR_AGENT, "member_role": "Agent"})
+			hr.save(ignore_permissions=True)
+
+	def a_ticket(self):
+		return self.raise_via_bridge(self.bridge_a, SITE_A, REQUESTER)["name"]
+
+	def transfer(self, ticket, to=HR, reason="Belongs to payroll.", category=None, as_user=None):
+		from help_pilot import api
+
+		frappe.set_user(as_user or self.agent)
+		try:
+			return api.transfer_ticket(
+				ticket=ticket, department=to, issue_category=category, reason=reason
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_the_ticket_lands_in_the_new_department(self):
+		ticket = self.a_ticket()
+		result = self.transfer(ticket)
+
+		self.assertEqual(result["department"], HR)
+		self.assertEqual(frappe.db.get_value("HP Ticket", ticket, "department"), HR)
+
+	def test_the_old_assignment_and_category_do_not_follow(self):
+		ticket = self.a_ticket()
+		make_category("Laptop", IT)
+		frappe.db.set_value(
+			"HP Ticket", ticket, {"assigned_agent": self.agent, "issue_category": f"{IT} - Laptop"}
+		)
+
+		self.transfer(ticket)
+
+		row = frappe.db.get_value(
+			"HP Ticket", ticket, ["assigned_agent", "issue_category"], as_dict=True
+		)
+		self.assertIsNone(row.assigned_agent)
+		self.assertIsNone(row.issue_category)
+
+	def test_a_category_in_the_new_department_can_be_set_on_the_way(self):
+		ticket = self.a_ticket()
+		payslip = make_category("Payslip", HR)
+
+		self.transfer(ticket, category=payslip.name)
+
+		self.assertEqual(
+			frappe.db.get_value("HP Ticket", ticket, "issue_category"), payslip.name
+		)
+
+	def test_the_thread_and_age_survive(self):
+		ticket = self.a_ticket()
+		opened = frappe.db.get_value("HP Ticket", ticket, "opening_datetime")
+
+		frappe.set_user(self.agent)
+		frappe.get_doc(
+			{"doctype": "HP Ticket Comment", "ticket": ticket, "comment": "<p>Earlier reply.</p>"}
+		).insert()
+		frappe.set_user("Administrator")
+
+		self.transfer(ticket)
+
+		self.assertEqual(frappe.db.get_value("HP Ticket", ticket, "opening_datetime"), opened)
+		comments = frappe.get_all(
+			"HP Ticket Comment", filters={"ticket": ticket}, fields=["comment", "is_internal_note"]
+		)
+		self.assertTrue(any("Earlier reply" in c.comment for c in comments))
+
+	def test_the_reason_is_internal_and_the_move_is_not(self):
+		ticket = self.a_ticket()
+		self.transfer(ticket, reason="Payroll data, not ours.")
+
+		comments = frappe.get_all(
+			"HP Ticket Comment",
+			filters={"ticket": ticket},
+			fields=["comment", "is_internal_note"],
+			order_by="creation asc",
+		)
+
+		internal = [c for c in comments if c.is_internal_note]
+		public = [c for c in comments if not c.is_internal_note]
+
+		self.assertTrue(any("Payroll data" in c.comment for c in internal))
+		# The requester must never see the reason, only that it moved.
+		self.assertFalse(any("Payroll data" in c.comment for c in public))
+		self.assertTrue(any(HR in c.comment for c in public))
+
+	def test_a_reason_is_required(self):
+		ticket = self.a_ticket()
+		with self.assertRaises(frappe.ValidationError):
+			self.transfer(ticket, reason="   ")
+
+	def test_you_cannot_move_a_ticket_that_is_not_yours(self):
+		ticket = self.a_ticket()
+		with self.assertRaises(frappe.PermissionError):
+			self.transfer(ticket, as_user=HR_AGENT)
+
+	def test_moving_it_nowhere_is_rejected(self):
+		ticket = self.a_ticket()
+		with self.assertRaises(frappe.ValidationError):
+			self.transfer(ticket, to=IT)
+
+	def test_the_mover_is_told_when_it_leaves_their_sight(self):
+		ticket = self.a_ticket()
+		result = self.transfer(ticket)
+
+		# The agent belongs to IT, not HR, so isolation takes it away from them.
+		self.assertFalse(result["still_visible"])
+
+	def test_the_receiving_team_is_alerted(self):
+		ticket = self.a_ticket()
+
+		with patch("frappe.publish_realtime") as pushed:
+			self.transfer(ticket)
+
+		alerted = {call.kwargs.get("user") for call in pushed.call_args_list}
+		self.assertIn(HR_AGENT, alerted)
 
 
 class TestTicketAttachments(BaseBridgeTest):
