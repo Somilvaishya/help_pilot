@@ -7,9 +7,13 @@ app_license = "mit"
 
 # ----------------------------------------------------------------------
 # Includes
+#
+# Bundled, not a plain /assets path. A plain path never changes between
+# releases, so browsers keep serving the file they cached and a deploy
+# looks like it did nothing. A bundle gets a content hash in its URL.
 # ----------------------------------------------------------------------
-app_include_css = "/assets/help_pilot/css/help_pilot.css"
-app_include_js = "/assets/help_pilot/js/help_pilot.js"
+app_include_css = "help_pilot.bundle.css"
+app_include_js = "help_pilot.bundle.js"
 
 # Frappe ships these mp3 files but registers only some of them, and `chime` is
 # commented out in its own hooks -- so play_sound("chime") finds no <audio>
