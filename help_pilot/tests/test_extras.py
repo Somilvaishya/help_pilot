@@ -138,42 +138,49 @@ class TestIssueCategory(BaseBridgeTest):
 
 
 class TestBranchAndContact(BaseBridgeTest):
-	def test_an_unknown_branch_is_created_on_the_hub(self):
-		if frappe.db.exists("Branch", "Kanpur Depot"):
-			frappe.delete_doc("Branch", "Kanpur Depot", force=1, ignore_permissions=True)
-
+	def raise_with_branch(self, branch, contact=None):
 		frappe.set_user(self.bridge_a)
-		result = bridge.create_ticket(
-			source_site=SITE_A,
-			requester_email=REQUESTER,
-			subject="Branch test",
-			description="<p>x</p>",
-			branch="Kanpur Depot",
-			contact_no="98765 43210",
-		)
-		frappe.set_user("Administrator")
+		try:
+			return bridge.create_ticket(
+				source_site=SITE_A,
+				requester_email=REQUESTER,
+				subject="Branch test",
+				description="<p>x</p>",
+				branch=branch,
+				contact_no=contact,
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_the_branch_is_kept_as_typed(self):
+		result = self.raise_with_branch("Kanpur Depot", "98765 43210")
 
 		row = frappe.db.get_value("HP Ticket", result["name"], ["branch", "contact_no"], as_dict=True)
 		self.assertEqual(row.branch, "Kanpur Depot")
 		self.assertEqual(row.contact_no, "98765 43210")
-		self.assertTrue(frappe.db.exists("Branch", "Kanpur Depot"))
 
-	def test_an_existing_branch_is_reused_not_duplicated(self):
-		if not frappe.db.exists("Branch", "Head Office"):
-			frappe.get_doc({"doctype": "Branch", "branch": "Head Office"}).insert(
-				ignore_permissions=True
-			)
+	def test_nothing_is_created_in_the_erpnext_branch_master(self):
+		before = frappe.db.count("Branch") if frappe.db.exists("DocType", "Branch") else 0
+		self.raise_with_branch("Somewhere Nobody Has Heard Of")
+		after = frappe.db.count("Branch") if frappe.db.exists("DocType", "Branch") else 0
 
-		frappe.set_user(self.bridge_a)
-		bridge.create_ticket(
-			source_site=SITE_A,
-			requester_email=REQUESTER,
-			subject="Branch reuse",
-			description="<p>x</p>",
-			branch="Head Office",
+		# Plain text now: the hub must not fill erpnext's master with whatever
+		# arrives from a client site.
+		self.assertEqual(after, before)
+
+	def test_a_branch_the_hub_has_never_seen_is_accepted(self):
+		result = self.raise_with_branch("Brand New Depot")
+		self.assertEqual(
+			frappe.db.get_value("HP Ticket", result["name"], "branch"), "Brand New Depot"
 		)
-		frappe.set_user("Administrator")
-		self.assertEqual(frappe.db.count("Branch", {"branch": "Head Office"}), 1)
+
+	def test_surrounding_space_is_trimmed(self):
+		result = self.raise_with_branch("   Kanpur Depot   ")
+		self.assertEqual(frappe.db.get_value("HP Ticket", result["name"], "branch"), "Kanpur Depot")
+
+	def test_a_branch_of_only_spaces_counts_as_none(self):
+		result = self.raise_with_branch("    ")
+		self.assertIsNone(frappe.db.get_value("HP Ticket", result["name"], "branch"))
 
 	def test_a_blank_branch_is_left_alone(self):
 		frappe.set_user(self.bridge_a)

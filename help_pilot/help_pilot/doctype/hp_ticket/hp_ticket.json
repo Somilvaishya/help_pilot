@@ -155,11 +155,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Whatever the requester typed on their own site. Plain text: branch lists differ from site to site, so there is nothing here to link to.",
    "fieldname": "branch",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_standard_filter": 1,
    "label": "Branch",
-   "options": "Branch",
    "search_index": 1
   },
   {

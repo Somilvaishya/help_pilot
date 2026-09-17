@@ -25,6 +25,7 @@ from help_pilot.permissions import BRIDGE_ROLE, is_system_admin
 
 MAX_SUBJECT = 200
 MAX_CONTACT = 40
+MAX_BRANCH = 140
 MAX_DESCRIPTION = 20000
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -152,27 +153,15 @@ def _keep_as_website_user(user):
 	frappe.clear_cache(user=user.name)
 
 
-def _ensure_branch(branch: str | None) -> str | None:
-	"""Map a branch name from a client site onto a Branch record here.
+def _clean_branch(branch: str | None) -> str | None:
+	"""Keep the branch as the requester typed it.
 
-	Client sites keep their own Branch list in their own database, so the name
-	arrives as text. Create it on first sight rather than dropping it -- a
-	rejected ticket helps nobody, and an unknown branch is not an error, just a
-	branch this hub has not seen yet.
+	Plain text on purpose. Every client site keeps its own branch list in its
+	own database, so there is no shared master to link to, and creating one
+	here from whatever arrives just fills the hub with half-matching records.
 	"""
 	branch = (branch or "").strip()
-	if not branch:
-		return None
-
-	if not frappe.db.exists("DocType", "Branch"):
-		# erpnext is not installed on this hub; nothing to link to.
-		return None
-
-	if frappe.db.exists("Branch", branch):
-		return branch
-
-	frappe.get_doc({"doctype": "Branch", "branch": branch}).insert(ignore_permissions=True)
-	return branch
+	return branch[:MAX_BRANCH] or None
 
 
 def _resolve_category(category: str | None, department: str) -> str | None:
@@ -273,7 +262,7 @@ def create_ticket(
 			"description": description[:MAX_DESCRIPTION],
 			"department": department,
 			"issue_category": category,
-			"branch": _ensure_branch(branch),
+			"branch": _clean_branch(branch),
 			"contact_no": (contact_no or "").strip()[:MAX_CONTACT] or None,
 			"priority": priority if priority in ("Low", "Medium", "High", "Urgent") else "Medium",
 			"raised_by": requester_email,
